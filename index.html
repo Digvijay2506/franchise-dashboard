@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Franchise Master Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #f4f6fb;
+    color: #1f2937;
+    padding: 20px;
+  }
+  header {
+    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+    color: white;
+    padding: 22px 30px;
+    border-radius: 14px;
+    margin-bottom: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    box-shadow: 0 6px 20px rgba(30,58,138,0.18);
+  }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header .meta { font-size: 13px; opacity: 0.9; }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+  .kpi {
+    background: white;
+    padding: 18px 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    border-left: 5px solid #3b82f6;
+  }
+  .kpi.green { border-left-color: #10b981; }
+  .kpi.orange { border-left-color: #f59e0b; }
+  .kpi.purple { border-left-color: #8b5cf6; }
+  .kpi .label { font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi .value { font-size: 26px; font-weight: 700; margin-top: 6px; color: #111827; }
+  .kpi .sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
+  .panel {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 22px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .panel h2 {
+    font-size: 16px;
+    margin-bottom: 14px;
+    color: #1e3a8a;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 8px;
+  }
+  .charts-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 22px;
+  }
+  .chart-box { position: relative; height: 280px; }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  .filters label { font-size: 12px; color: #6b7280; font-weight: 600; }
+  select, input[type="text"] {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    background: white;
+    min-width: 140px;
+  }
+  input[type="text"] { min-width: 240px; flex: 1; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th, td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #f1f5f9;
+    white-space: nowrap;
+  }
+  th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    position: sticky;
+    top: 0;
+  }
+  th:hover { background: #e2e8f0; }
+  tbody tr:hover { background: #f8fafc; }
+  .table-wrap {
+    max-height: 540px;
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .cat-badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 11px;
+  }
+  .cat-A\\+ { background: #dcfce7; color: #166534; }
+  .cat-A { background: #dbeafe; color: #1e40af; }
+  .cat-B { background: #fef9c3; color: #854d0e; }
+  .cat-C { background: #ffedd5; color: #9a3412; }
+  .cat-D { background: #fee2e2; color: #991b1b; }
+  .cat-E { background: #f3f4f6; color: #374151; }
+  .pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    font-size: 13px;
+    color: #6b7280;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pagination button {
+    padding: 6px 12px;
+    border: 1px solid #d1d5db;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 0 2px;
+  }
+  .pagination button.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+  .pagination button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .loader {
+    text-align: center;
+    padding: 60px;
+    font-size: 16px;
+    color: #6b7280;
+  }
+  .loader .spin {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e5e7eb;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 10px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-box {
+    background: #fee2e2;
+    color: #991b1b;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+  }
+  @media (max-width: 700px) {
+    header h1 { font-size: 18px; }
+    .kpi .value { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🏥 Genericart Franchise Master Dashboard</h1>
+    <div class="meta" id="lastUpdated">Loading data...</div>
+  </div>
+  <div class="meta">Auto-syncs from <code>data.csv</code></div>
+</header>
+
+<div id="loader" class="loader">
+  <div class="spin"></div><br>
+  Loading franchise data from CSV…
+</div>
+
+<div id="errorBox" class="error-box" style="display:none;"></div>
+
+<div id="dashboard" style="display:none;">
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="label">Total Franchises</div>
+      <div class="value" id="kpiTotal">0</div>
+      <div class="sub" id="kpiTotalSub"></div>
+    </div>
+    <div class="kpi green">
+      <div class="label">Active (FY 25-26)</div>
+      <div class="value" id="kpiActive">0</div>
+      <div class="sub" id="kpiActiveSub"></div>
+    </div>
+    <div class="kpi orange">
+      <div class="label">FY 25-26 Total Purchase</div>
+      <div class="value" id="kpiRevenue">₹0</div>
+      <div class="sub" id="kpiRevenueSub"></div>
+    </div>
+    <div class="kpi purple">
+      <div class="label">Avg Growth (YoY)</div>
+      <div class="value" id="kpiGrowth">0%</div>
+      <div class="sub" id="kpiGrowthSub"></div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="panel">
+    <h2>🔎 Filters & Search</h2>
+    <div class="filters">
+      <input type="text" id="searchBox" placeholder="Search by Franchise Name, Code, Owner, City..." />
+      <div>
+        <label>Zone</label><br>
+        <select id="filterZone"><option value="">All Zones</option></select>
+      </div>
+      <div>
+        <label>State</label><br>
+        <select id="filterState"><option value="">All States</option></select>
+      </div>
+      <div>
+        <label>Franchise Type</label><br>
+        <select id="filterType"><option value="">All Types</option></select>
+      </div>
+      <div>
+        <label>Category (FY 25-26)</label><br>
+        <select id="filterCat">
+          <option value="">All Categories</option>
+          <option>A+</option><option>A</option><option>B</option>
+          <option>C</option><option>D</option><option>E</option>
+        </select>
+      </div>
+      <button onclick="resetFilters()" style="padding:9px 14px;border:1px solid #d1d5db;background:white;border-radius:8px;cursor:pointer;font-size:13px;">Reset</button>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="panel">
+    <h2>📊 Insights</h2>
+    <div class="charts-row">
+      <div>
+        <h3 style="font-size:13px;color:#6b7280;margin-bottom:8px;">Category Distribution (FY 25-26)</h3>
+        <div class="chart-box"><canvas id="catChart"></canvas></div>
+      </div>
+      <div>
+        <h3 style="font-size:13px;color:#6b7280;margin-bottom:8px;">Zone-wise Franchise Count</h3>
+        <div class="chart-box"><canvas id="zoneChart"></canvas></div>
+      </div>
+      <div>
+        <h3 style="font-size:13px;color:#6b7280;margin-bottom:8px;">Top 10 Franchises by FY 25-26 Purchase</h3>
+        <div class="chart-box"><canvas id="topChart"></canvas></div>
+      </div>
+      <div>
+        <h3 style="font-size:13px;color:#6b7280;margin-bottom:8px;">Monthly Trend (FY 25-26)</h3>
+        <div class="chart-box"><canvas id="trendChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Table -->
+  <div class="panel">
+    <h2>📋 Franchise Records</h2>
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th data-sort="SR No.">SR</th>
+            <th data-sort="Franchise Code">Code</th>
+            <th data-sort="Franchise Name">Franchise Name</th>
+            <th data-sort="owner Name">Owner</th>
+            <th data-sort="Franchise Type">Type</th>
+            <th data-sort="Zone">Zone</th>
+            <th data-sort="State Name">State</th>
+            <th data-sort="City Name">City</th>
+            <th data-sort="FY 2025-26 Total Purchase">FY25-26 Purchase</th>
+            <th data-sort="FY 2025-26 Average">Avg</th>
+            <th data-sort="FY 2025-26 Average Category">Cat</th>
+            <th data-sort="Growth % same period with last year">Growth %</th>
+            <th data-sort="WMS code created Month">Created</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <div id="paginationInfo"></div>
+      <div id="paginationControls"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CSV_URL = './data.csv';
+let rawData = [];
+let filteredData = [];
+let currentPage = 1;
+const pageSize = 25;
+let sortKey = 'SR No.';
+let sortDir = 1;
+let charts = {};
+
+// --- Helpers ---
+function num(v) {
+  if (v === null || v === undefined) return 0;
+  const s = String(v).replace(/,/g, '').replace(/₹/g, '').trim();
+  if (s === '' || s === '*' || s === '#N/A' || s === 'NULL' || s === 'NaN') return 0;
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function fmtINR(n) {
+  if (n >= 10000000) return '₹' + (n/10000000).toFixed(2) + ' Cr';
+  if (n >= 100000) return '₹' + (n/100000).toFixed(2) + ' L';
+  if (n >= 1000) return '₹' + (n/1000).toFixed(1) + ' K';
+  return '₹' + Math.round(n);
+}
+
+function fmtNum(n) {
+  return new Intl.NumberFormat('en-IN').format(Math.round(n));
+}
+
+function catClass(c) {
+  const v = String(c || '').replace('+', '\\+');
+  return 'cat-' + v;
+}
+
+function showError(msg) {
+  document.getElementById('loader').style.display = 'none';
+  const box = document.getElementById('errorBox');
+  box.style.display = 'block';
+  box.innerHTML = '<strong>⚠ Error loading CSV:</strong><br>' + msg +
+    '<br><br><em>Make sure <code>data.csv</code> is in the same folder as <code>index.html</code>. ' +
+    'If you opened this HTML directly (file://), use a local server or GitHub Pages instead.</em>';
+}
+
+// --- Load CSV ---
+Papa.parse(CSV_URL, {
+  download: true,
+  header: true,
+  skipEmptyLines: true,
+  complete: function(results) {
+    try {
+      rawData = results.data.filter(r => r['Franchise Code'] || r['Franchise Name']);
+      if (rawData.length === 0) {
+        showError('CSV loaded but no rows found. Check the file content.');
+        return;
+      }
+      initDashboard();
+    } catch (e) {
+      showError(e.message);
+    }
+  },
+  error: function(err) {
+    showError(err.message || 'Failed to fetch data.csv');
+  }
+});
+
+function initDashboard() {
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('lastUpdated').textContent =
+    'Data refreshed: ' + new Date().toLocaleString() + ' • ' + rawData.length + ' records loaded';
+
+  populateFilters();
+  attachListeners();
+  applyFilters();
+}
+
+function populateFilters() {
+  const zones = [...new Set(rawData.map(r => r['Zone']).filter(Boolean))].sort();
+  const states = [...new Set(rawData.map(r => r['State Name']).filter(Boolean))].sort();
+  const types = [...new Set(rawData.map(r => r['Franchise Type']).filter(Boolean))].sort();
+
+  fillSelect('filterZone', zones);
+  fillSelect('filterState', states);
+  fillSelect('filterType', types);
+}
+
+function fillSelect(id, arr) {
+  const sel = document.getElementById(id);
+  arr.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = v;
+    sel.appendChild(o);
+  });
+}
+
+function attachListeners() {
+  ['searchBox','filterZone','filterState','filterType','filterCat'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => { currentPage = 1; applyFilters(); });
+    document.getElementById(id).addEventListener('change', () => { currentPage = 1; applyFilters(); });
+  });
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.getAttribute('data-sort');
+      if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; }
+      applyFilters();
+    });
+  });
+}
+
+function resetFilters() {
+  document.getElementById('searchBox').value = '';
+  ['filterZone','filterState','filterType','filterCat'].forEach(id => document.getElementById(id).value = '');
+  currentPage = 1;
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchBox').value.toLowerCase().trim();
+  const z = document.getElementById('filterZone').value;
+  const s = document.getElementById('filterState').value;
+  const t = document.getElementById('filterType').value;
+  const c = document.getElementById('filterCat').value;
+
+  filteredData = rawData.filter(r => {
+    if (z && r['Zone'] !== z) return false;
+    if (s && r['State Name'] !== s) return false;
+    if (t && r['Franchise Type'] !== t) return false;
+    if (c && r['FY 2025-26 Average Category'] !== c) return false;
+    if (q) {
+      const hay = [r['Franchise Name'], r['Franchise Code'], r['owner Name'], r['City Name'], r['State Name'], r['Zone']]
+        .join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  filteredData.sort((a, b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    const an = num(av), bn = num(bv);
+    if (an !== 0 || bn !== 0) return (an - bn) * sortDir;
+    return String(av || '').localeCompare(String(bv || '')) * sortDir;
+  });
+
+  renderKPIs();
+  renderCharts();
+  renderTable();
+}
+
+function renderKPIs() {
+  const total = filteredData.length;
+  const active = filteredData.filter(r => num(r['FY 2025-26 Total Purchase']) > 0).length;
+  const revenue = filteredData.reduce((s, r) => s + num(r['FY 2025-26 Total Purchase']), 0);
+  const growths = filteredData.map(r => num(r['Growth % same period with last year'])).filter(g => g !== 0);
+  const avgGrowth = growths.length ? growths.reduce((a,b)=>a+b,0)/growths.length : 0;
+
+  document.getElementById('kpiTotal').textContent = fmtNum(total);
+  document.getElementById('kpiTotalSub').textContent = 'of ' + fmtNum(rawData.length) + ' total';
+  document.getElementById('kpiActive').textContent = fmtNum(active);
+  document.getElementById('kpiActiveSub').textContent = total ? ((active/total*100).toFixed(1) + '% active') : '';
+  document.getElementById('kpiRevenue').textContent = fmtINR(revenue);
+  document.getElementById('kpiRevenueSub').textContent = 'avg ' + fmtINR(active ? revenue/active : 0) + ' / franchise';
+  document.getElementById('kpiGrowth').textContent = (avgGrowth >= 0 ? '+' : '') + avgGrowth.toFixed(1) + '%';
+  document.getElementById('kpiGrowthSub').textContent = 'based on ' + growths.length + ' comparable franchises';
+}
+
+function renderCharts() {
+  // Category distribution
+  const cats = {'A+':0,'A':0,'B':0,'C':0,'D':0,'E':0};
+  filteredData.forEach(r => {
+    const c = (r['FY 2025-26 Average Category'] || 'E').trim();
+    if (cats[c] !== undefined) cats[c]++; else cats['E']++;
+  });
+  drawChart('catChart', 'doughnut', {
+    labels: Object.keys(cats),
+    datasets: [{ data: Object.values(cats), backgroundColor: ['#10b981','#3b82f6','#facc15','#f97316','#ef4444','#9ca3af'] }]
+  }, { plugins: { legend: { position: 'right' } } });
+
+  // Zone distribution
+  const zoneMap = {};
+  filteredData.forEach(r => {
+    const z = r['Zone'] || 'Unknown';
+    zoneMap[z] = (zoneMap[z] || 0) + 1;
+  });
+  drawChart('zoneChart', 'bar', {
+    labels: Object.keys(zoneMap),
+    datasets: [{ label: 'Franchises', data: Object.values(zoneMap), backgroundColor: '#3b82f6' }]
+  }, { plugins: { legend: { display: false } } });
+
+  // Top 10
+  const top = [...filteredData]
+    .sort((a,b) => num(b['FY 2025-26 Total Purchase']) - num(a['FY 2025-26 Total Purchase']))
+    .slice(0, 10);
+  drawChart('topChart', 'bar', {
+    labels: top.map(r => (r['Franchise Name'] || '').substring(0, 18)),
+    datasets: [{ label: 'FY 25-26 Purchase', data: top.map(r => num(r['FY 2025-26 Total Purchase'])), backgroundColor: '#8b5cf6' }]
+  }, { indexAxis: 'y', plugins: { legend: { display: false } } });
+
+  // Monthly trend FY 25-26
+  const months = ['Apr_25','May_25','Jun_25','Jul_25','Aug_25','Sep_25','Oct_25','Nov_25','Dec_25','Jan_26','Feb_26','Mar_26'];
+  const monthLabels = ['Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
+  const totals = months.map(m => filteredData.reduce((s, r) => s + num(r[m]), 0));
+  drawChart('trendChart', 'line', {
+    labels: monthLabels,
+    datasets: [{ label: 'Monthly Purchase', data: totals, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', fill: true, tension: 0.35 }]
+  }, { plugins: { legend: { display: false } } });
+}
+
+function drawChart(id, type, data, opts = {}) {
+  const ctx = document.getElementById(id).getContext('2d');
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, ...opts } });
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  const start = (currentPage - 1) * pageSize;
+  const pageData = filteredData.slice(start, start + pageSize);
+
+  tbody.innerHTML = pageData.map(r => {
+    const cat = (r['FY 2025-26 Average Category'] || 'E').trim();
+    const growth = num(r['Growth % same period with last year']);
+    const growthColor = growth > 0 ? '#10b981' : growth < 0 ? '#ef4444' : '#6b7280';
+    return `<tr>
+      <td>${r['SR No.'] || ''}</td>
+      <td><strong>${r['Franchise Code'] || ''}</strong></td>
+      <td>${r['Franchise Name'] || ''}</td>
+      <td>${r['owner Name'] || ''}</td>
+      <td>${r['Franchise Type'] || ''}</td>
+      <td>${r['Zone'] || ''}</td>
+      <td>${r['State Name'] || ''}</td>
+      <td>${r['City Name'] || ''}</td>
+      <td>${fmtINR(num(r['FY 2025-26 Total Purchase']))}</td>
+      <td>${fmtINR(num(r['FY 2025-26 Average']))}</td>
+      <td><span class="cat-badge ${catClass(cat)}">${cat}</span></td>
+      <td style="color:${growthColor};font-weight:600;">${growth ? (growth > 0 ? '+' : '') + growth.toFixed(1) + '%' : '—'}</td>
+      <td>${r['WMS code created Month'] || ''} ${r['WMS code created year'] || ''}</td>
+    </tr>`;
+  }).join('');
+
+  // Pagination
+  const totalPages = Math.ceil(filteredData.length / pageSize) || 1;
+  document.getElementById('paginationInfo').textContent =
+    `Showing ${filteredData.length === 0 ? 0 : start + 1}–${Math.min(start + pageSize, filteredData.length)} of ${filteredData.length} records`;
+
+  let controls = '';
+  controls += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="goPage(${currentPage - 1})">‹ Prev</button>`;
+  // Show up to 5 page buttons
+  let pStart = Math.max(1, currentPage - 2);
+  let pEnd = Math.min(totalPages, pStart + 4);
+  pStart = Math.max(1, pEnd - 4);
+  for (let i = pStart; i <= pEnd; i++) {
+    controls += `<button class="${i === currentPage ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+  }
+  controls += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="goPage(${currentPage + 1})">Next ›</button>`;
+  document.getElementById('paginationControls').innerHTML = controls;
+}
+
+function goPage(p) {
+  currentPage = p;
+  renderTable();
+}
+</script>
+</body>
+</html>
